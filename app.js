@@ -1,6 +1,7 @@
 const express = require("express");
 const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
+const _ = require("lodash");
 
 const app = express();
 
@@ -27,6 +28,12 @@ const item3 = new Item({
 });
 
 const defaultItems = [item1,item2,item3];
+const listSchema = {
+    name: String,
+    items: [itemsSchema]
+};
+
+const List = mongoose.model("list", listSchema);
 
 
 async function getItems(){
@@ -47,28 +54,81 @@ app.get("/",function(req,res){
       });
 });
 
+app.get("/:customListName", function(req,res){
+    const customListName = _.capitalize(req.params.customListName);
+    async function checkIfList(){
+        return await List.findOne({name: customListName});
+    };
+
+    checkIfList().then(function(err,foundList){
+        if (!err){
+            if(!foundList){
+                //Create a new list
+                const list = new List({
+                    name: customListName,
+                    items: defaultItems
+                });
+                list.save();
+                res.redirect("/" + customListName);
+            }else {
+                //Show an existing list 
+                res.render("list", {kindOfDay: foundList.name, newListItems:foundList.items});
+            }
+        }
+    });  
+
+});
+
 
 app.post("/",function(req,res){
     const itemName = req.body.task;
+    const listName = req.body.list;
     const item = new Item({
         name:itemName
     });
-    item.save();
-    res.redirect("/");
+    if (listName==="Today"){
+        item.save();
+        res.redirect("/");
+    }else {
+        async function checking(){
+            return await List.findOne({name: listName});
+        };
+       checking().then(function(err,foundList){
+        foundList.items.push(item);
+        foundList.save();
+        res.redirect("/" + listName);
+       });
+    }
+    
 });
 
 app.post("/delete",function(req,res){
     const checkedItemId = req.body.checkbox;
-    async function deleteItems(){
+    const listName = req.body.listName;
+    if (listName==="Today"){
+        async function deleteItems(){
 
-        return await Item.findByIdAndRemove(checkedItemId);
-      }
-      deleteItems().then(function(err){
-        if (!err){
-            console.log("Success delete");
-        }
-      });
-      res.redirect("/");
+            return await Item.findByIdAndRemove(checkedItemId);
+          };
+          deleteItems().then(function(err){
+            if (!err){
+                console.log("Success delete");
+            }
+          });
+          res.redirect("/");
+
+    } else{
+        async function deleteOneitem(){
+
+            return await  List.findOneAndUpdate({name: listName},{$pull: {items: {_id : checkedItemId}}});
+          };
+          deleteOneitem().then(function(err,foundList){
+            if (!err){
+                res.redirect("/"+ listName);
+            }
+          }); 
+    }
+    
 });
 
 app.listen(3000, function(){
