@@ -47,6 +47,7 @@ app.get("/",function(req,res){
       });
 });
 
+
 app.post("/",function(req,res){
     const itemName = req.body.task;
     const item = new Item({
@@ -54,6 +55,20 @@ app.post("/",function(req,res){
     });
     item.save();
     res.redirect("/");
+});
+
+app.post("/delete",function(req,res){
+    const checkedItemId = req.body.checkbox;
+    async function deleteItems(){
+
+        return await Item.findByIdAndRemove(checkedItemId);
+      }
+      deleteItems().then(function(err){
+        if (!err){
+            console.log("Success delete");
+        }
+      });
+      res.redirect("/");
 });
 
 app.listen(3000, function(){
